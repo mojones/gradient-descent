@@ -345,10 +345,12 @@
   const scratchpad = document.getElementById('scratchpad');
   const SCRATCHPAD_STORAGE_KEY = 'gradient-descent-scratchpad';
   const POINTS_URL_PARAM = 'points';
+  const ACTIVATION_URL_PARAM = 'activation';
+  const SLOPE_URL_PARAM = 'slope';
   const SSE_BAR_MAX = 10;
 
-  // --- Shareable data points ---
-  // Points are encoded as: ?points=x1,y1;x2,y2;...
+  // --- Shareable model state ---
+  // Example: ?points=x1,y1;x2,y2&activation=tanh&slope=1.25
   function pointsFromUrl() {
     const params = new URLSearchParams(window.location.search);
     if (!params.has(POINTS_URL_PARAM)) return null;
@@ -369,12 +371,26 @@
     });
   }
 
-  function syncPointsToUrl() {
+  function activationFromUrl() {
+    const activationParam = new URLSearchParams(window.location.search).get(ACTIVATION_URL_PARAM);
+    return activationParam === 'linear' || activationParam === 'tanh' ? activationParam : null;
+  }
+
+  function slopeFromUrl() {
+    const value = Number(new URLSearchParams(window.location.search).get(SLOPE_URL_PARAM));
+    const min = Number(slopeSlider.min);
+    const max = Number(slopeSlider.max);
+    return Number.isFinite(value) && value >= min && value <= max ? value : null;
+  }
+
+  function syncStateToUrl() {
     const url = new URL(window.location.href);
     const encodedPoints = points.map(function(point) {
       return `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
     }).join(';');
     url.searchParams.set(POINTS_URL_PARAM, encodedPoints);
+    url.searchParams.set(ACTIVATION_URL_PARAM, activation);
+    url.searchParams.set(SLOPE_URL_PARAM, slope.toFixed(2));
     window.history.replaceState(null, '', url);
   }
 
@@ -871,13 +887,26 @@
     }
     const ssePct = Math.min(100, (sse / SSE_BAR_MAX) * 100);
     sseBarFill.style.width = ssePct + '%';
-    syncPointsToUrl();
+    syncStateToUrl();
     draw(); drawBarChart();
   }
 
   // --- Init ---
   function init() {
     setupCanvas();
+
+    const urlActivation = activationFromUrl();
+    if (urlActivation !== null) {
+      activation = urlActivation;
+      document.querySelector(`input[name="activation"][value="${activation}"]`).checked = true;
+    }
+
+    const urlSlope = slopeFromUrl();
+    if (urlSlope !== null) {
+      slope = urlSlope;
+      slopeSlider.value = slope;
+    }
+
     const urlPoints = pointsFromUrl();
     points = urlPoints === null ? [
       { x: -0.8, y: -0.7 }, { x: -0.4, y: -0.3 },
