@@ -21,8 +21,29 @@
   h1 {
     font-size: 1.3rem;
     font-weight: 600;
-    margin-bottom: 2px;
+    margin: 0;
   }
+
+  .page-heading {
+    width: 100%;
+    max-width: 1360px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+  }
+
+  .help-button {
+    background: #fff;
+    color: #369;
+    border: 1px solid #b9d2e8;
+    border-radius: 999px;
+    padding: 4px 10px;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+
+  .help-button:hover { background: #f4f9fd; }
 
   .subtitle {
     font-size: 0.8rem;
@@ -177,11 +198,63 @@
   .instructions ul { list-style: none; padding-left: 0; }
   .instructions li { padding: 1px 0; }
   .instructions li::before { content: "· "; color: #ccc; }
+
+  .help-modal[hidden] { display: none; }
+
+  .help-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 10;
+    display: grid;
+    place-items: center;
+    padding: 20px;
+    background: rgba(0, 0, 0, 0.28);
+  }
+
+  .help-dialog {
+    width: min(620px, 100%);
+    max-height: min(720px, calc(100vh - 40px));
+    overflow-y: auto;
+    padding: 20px;
+    background: #fff;
+    border: 1px solid #d8d8d8;
+    border-radius: 8px;
+    box-shadow: 0 12px 36px rgba(0, 0, 0, 0.14);
+  }
+
+  .help-dialog-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 14px;
+  }
+
+  .help-dialog h2 { font-size: 1.1rem; font-weight: 600; }
+  .help-dialog h3 { font-size: 0.85rem; margin: 18px 0 7px; }
+  .help-dialog p, .help-dialog li { font-size: 0.85rem; line-height: 1.55; }
+  .help-dialog ol, .help-dialog ul { padding-left: 20px; }
+  .help-dialog li + li { margin-top: 4px; }
+
+  .help-close {
+    border: 0;
+    background: #f3f3f3;
+    border-radius: 4px;
+    padding: 5px 8px;
+    color: #555;
+    cursor: pointer;
+  }
+  .help-close:hover { background: #e9e9e9; }
+
+  body.modal-open { overflow: hidden; }
 </style>
 </head>
 <body>
 
-<h1>Gradient Descent Playground</h1>
+<div class="page-heading">
+  <h1>Gradient Descent Playground</h1>
+  <button class="help-button" id="helpButton" type="button" aria-haspopup="dialog" aria-controls="helpModal">Help</button>
+</div>
 <p class="subtitle">y = f(w·x), bias = 0 — minimize the sum of squared errors by adjusting w</p>
 
 <div class="scratchpad">
@@ -272,6 +345,33 @@
 
 </div>
 
+<div class="help-modal" id="helpModal" role="dialog" aria-modal="true" aria-labelledby="helpTitle" hidden>
+  <div class="help-dialog" role="document">
+    <div class="help-dialog-header">
+      <h2 id="helpTitle">How to use this playground</h2>
+      <button class="help-close" id="helpCloseButton" type="button" aria-label="Close help">Close</button>
+    </div>
+
+    <h3>Start here</h3>
+    <ol>
+      <li>Click the chart to add a few data points. Drag a point to move it; right-click one to remove it.</li>
+      <li>Move the <b>w</b> slider, or scroll while over the chart or slider, to change the model.</li>
+      <li>Try to make the red/orange error lines and the <b>SSE</b> score as small as possible.</li>
+      <li>Press <b>Find Best w</b> to compare your answer with the best fit for the current points.</li>
+    </ol>
+
+    <h3>More detail</h3>
+    <ul>
+      <li><b>What the model does:</b> the bias is fixed at zero. In Linear mode, the prediction is y = w·x. In tanh mode, it is y = tanh(w·x), which keeps predictions between -1 and 1.</li>
+      <li><b>Residual lines:</b> each red/orange line joins a data point to its prediction. Its length is that point’s error.</li>
+      <li><b>Squared error:</b> the bar chart shows each error squared; the SSE is their sum. Use the log-scale option to make very small errors easier to compare.</li>
+      <li><b>tanh insets:</b> in tanh mode, a small curve beside each point shows the pre-activation value w·x and where it lands after tanh.</li>
+      <li><b>Sharing:</b> the URL updates automatically with your data points, selected activation function, and slope. Copy it to share the same experiment.</li>
+      <li><b>Scratch pad:</b> notes are saved only in this browser, on this device.</li>
+    </ul>
+  </div>
+</div>
+
 <script>
 (function() {
   'use strict';
@@ -343,6 +443,9 @@
   const logScaleCheckbox = document.getElementById('logScale');
   const sseBarFill = document.getElementById('sseBarFill');
   const scratchpad = document.getElementById('scratchpad');
+  const helpButton = document.getElementById('helpButton');
+  const helpModal = document.getElementById('helpModal');
+  const helpCloseButton = document.getElementById('helpCloseButton');
   const SCRATCHPAD_STORAGE_KEY = 'gradient-descent-scratchpad';
   const POINTS_URL_PARAM = 'points';
   const ACTIVATION_URL_PARAM = 'activation';
@@ -819,6 +922,30 @@
   });
 
   // --- Listeners ---
+  let previousFocus = null;
+
+  function openHelp() {
+    previousFocus = document.activeElement;
+    helpModal.hidden = false;
+    document.body.classList.add('modal-open');
+    helpCloseButton.focus();
+  }
+
+  function closeHelp() {
+    helpModal.hidden = true;
+    document.body.classList.remove('modal-open');
+    if (previousFocus instanceof HTMLElement) previousFocus.focus();
+  }
+
+  helpButton.addEventListener('click', openHelp);
+  helpCloseButton.addEventListener('click', closeHelp);
+  helpModal.addEventListener('click', function(event) {
+    if (event.target === helpModal) closeHelp();
+  });
+  document.addEventListener('keydown', function(event) {
+    if (event.key === 'Escape' && !helpModal.hidden) closeHelp();
+  });
+
   // Notes are local to this browser/device and restore automatically.
   scratchpad.value = localStorage.getItem(SCRATCHPAD_STORAGE_KEY) || '';
   scratchpad.addEventListener('input', function() {
