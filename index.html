@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Gradient Descent Playground</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    background: #fff;
+    color: #222;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    padding: 20px;
+  }
+
+  h1 {
+    font-size: 1.3rem;
+    font-weight: 600;
+    margin-bottom: 2px;
+  }
+
+  .subtitle {
+    font-size: 0.8rem;
+    color: #888;
+    margin-bottom: 16px;
+  }
+
+  .main-container {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    justify-content: center;
+    max-width: 1360px;
+    width: 100%;
+  }
+
+  .chart-section { flex: 1; min-width: 520px; max-width: 640px; }
+  .bar-chart-section { width: 220px; flex-shrink: 0; }
+
+  .controls-section {
+    width: 280px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .panel {
+    border: 1px solid #e0e0e0;
+    border-radius: 8px;
+    padding: 12px;
+  }
+
+  .panel-title {
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #999;
+    margin-bottom: 8px;
+  }
+
+  canvas {
+    display: block;
+    background: #fff;
+    border-radius: 4px;
+    cursor: crosshair;
+    width: 100%;
+    height: auto;
+  }
+
+  .slider-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  .slider-row label {
+    font-size: 0.85rem;
+    min-width: 30px;
+  }
+
+  input[type="range"] { flex: 1; cursor: pointer; }
+
+  .slider-value {
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    min-width: 50px;
+    text-align: right;
+  }
+
+  .stats { display: flex; flex-direction: column; gap: 4px; }
+
+  .stat-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.82rem;
+  }
+
+  .stat-label { color: #888; }
+  .stat-value { font-family: 'Courier New', monospace; font-weight: 600; }
+  #sseValue { color: #d33; }
+  #bestSlopeValue { color: #2a9; }
+  #pointCountValue { color: #369; }
+
+  .sse-bar-wrapper { margin-top: 10px; }
+  .sse-bar-label { font-size: 0.65rem; color: #999; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 3px; }
+  .sse-bar-track { width: 100%; height: 18px; background: #f5f5f5; border-radius: 3px; overflow: hidden; border: 1px solid #e0e0e0; }
+  .sse-bar-fill { height: 100%; width: 0%; background: #d33; border-radius: 2px; transition: width 0.08s linear; }
+  .sse-bar-scale { display: flex; justify-content: space-between; font-size: 0.6rem; color: #bbb; font-family: 'Courier New', monospace; margin-top: 2px; }
+
+  .activation-row { display: flex; gap: 16px; }
+  .activation-row label { display: flex; align-items: center; gap: 5px; font-size: 0.85rem; cursor: pointer; }
+
+  .equation {
+    font-family: 'Courier New', monospace;
+    font-size: 0.85rem;
+    text-align: center;
+    padding: 6px;
+    background: #f9f9f9;
+    border-radius: 4px;
+  }
+
+  .btn {
+    background: #f5f5f5;
+    color: #333;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    padding: 6px 12px;
+    font-size: 0.8rem;
+    cursor: pointer;
+  }
+  .btn:hover { background: #eee; }
+
+  .btn-row { display: flex; gap: 6px; flex-wrap: wrap; }
+
+  .toggle-row { display: flex; align-items: center; gap: 6px; font-size: 0.8rem; }
+
+  .instructions { font-size: 0.75rem; color: #888; line-height: 1.5; }
+  .instructions ul { list-style: none; padding-left: 0; }
+  .instructions li { padding: 1px 0; }
+  .instructions li::before { content: "· "; color: #ccc; }
+</style>
+</head>
+<body>
+
+<h1>Gradient Descent Playground</h1>
+<p class="subtitle">y = f(w·x), bias = 0 — minimize the sum of squared errors by adjusting w</p>
+
+<div class="main-container">
+
+  <div class="chart-section">
+    <div class="panel">
+      <canvas id="chart" width="600" height="600"></canvas>
+    </div>
+  </div>
+
+  <div class="bar-chart-section">
+    <div class="panel">
+      <div class="panel-title">Squared Error per Point</div>
+      <canvas id="barChart" width="220" height="600"></canvas>
+    </div>
+  </div>
+
+  <div class="controls-section">
+    <div class="panel">
+      <div class="panel-title">Activation Function</div>
+      <div class="activation-row">
+        <label><input type="radio" name="activation" value="linear" checked> <span>Linear</span></label>
+        <label><input type="radio" name="activation" value="tanh"> <span>tanh</span></label>
+      </div>
+      <div class="equation" id="equationDisplay" style="margin-top:8px">y = 1.00 · x</div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Slope (Weight)</div>
+      <div class="slider-row">
+        <label>w =</label>
+        <input type="range" id="slopeSlider" min="-10" max="20" step="0.01" value="1">
+        <span class="slider-value" id="slopeValue">1.00</span>
+      </div>
+      <div class="btn-row" style="margin-top:8px">
+        <button class="btn" id="bestSlopeBtn">Find Best w</button>
+        <button class="btn" id="resetSlopeBtn">Reset w</button>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Statistics</div>
+      <div class="stats">
+        <div class="stat-row"><span class="stat-label">Data points:</span><span class="stat-value" id="pointCountValue">0</span></div>
+        <div class="stat-row"><span class="stat-label">Sum of Squared Errors:</span><span class="stat-value" id="sseValue">0.00</span></div>
+        <div class="stat-row"><span class="stat-label">Best w:</span><span class="stat-value" id="bestSlopeValue">—</span></div>
+        <div class="stat-row"><span class="stat-label">Mean Squared Error:</span><span class="stat-value" id="mseValue">0.00</span></div>
+      </div>
+      <div class="sse-bar-wrapper">
+        <div class="sse-bar-label">SSE</div>
+        <div class="sse-bar-track"><div class="sse-bar-fill" id="sseBarFill"></div></div>
+        <div class="sse-bar-scale">
+          <span>0</span><span>2.5</span><span>5</span><span>7.5</span><span>10</span>
+        </div>
+      </div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">Display Options</div>
+      <div class="toggle-row"><input type="checkbox" id="showErrorLines" checked> <label for="showErrorLines">Show error lines (residuals)</label></div>
+      <div class="toggle-row"><input type="checkbox" id="showBestLine"> <label for="showBestLine">Show best-fit line (dashed)</label></div>
+      <div class="toggle-row"><input type="checkbox" id="logScale"> <label for="logScale">Log scale (bar chart)</label></div>
+    </div>
+
+    <div class="panel">
+      <div class="panel-title">How to Use</div>
+      <div class="instructions">
+        <ul>
+          <li><b>Click</b> empty space to add a point</li>
+          <li><b>Drag</b> a point to move it</li>
+          <li><b>Right-click</b> a point to remove it</li>
+          <li>Adjust the <b>slope slider</b> to see SSE change</li>
+          <li>Red/orange lines = error (residual) per point</li>
+          <li>Switch to <b>tanh</b> to see the activation curve</li>
+        </ul>
+      </div>
+      <div class="btn-row" style="margin-top:8px">
+        <button class="btn" id="clearBtn">Clear All Points</button>
+        <button class="btn" id="seedBtn">Seed Sample Data</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+(function() {
+  'use strict';
+
+  const canvas = document.getElementById('chart');
+  const ctx = canvas.getContext('2d');
+  const barCanvas = document.getElementById('barChart');
+  const barCtx = barCanvas.getContext('2d');
+
+  // --- Coordinate system ---
+  const WORLD_MIN = -1;
+  const WORLD_MAX = 1;
+  const WORLD_RANGE = WORLD_MAX - WORLD_MIN;
+  const PADDING = 40;
+
+  function getDrawSize() {
+    const rect = canvas.getBoundingClientRect();
+    return { w: rect.width, h: rect.height };
+  }
+
+  function setupCanvas() {
+    const dpr = window.devicePixelRatio || 1;
+    const rect = canvas.getBoundingClientRect();
+    canvas.width = rect.width * dpr;
+    canvas.height = rect.height * dpr;
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+    const barRect = barCanvas.getBoundingClientRect();
+    barCanvas.width = barRect.width * dpr;
+    barCanvas.height = barRect.height * dpr;
+    barCtx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  }
+
+  function worldToPixel(wx, wy) {
+    const { w, h } = getDrawSize();
+    const drawW = w - PADDING * 2;
+    const drawH = h - PADDING * 2;
+    const px = PADDING + ((wx - WORLD_MIN) / WORLD_RANGE) * drawW;
+    const py = PADDING + ((WORLD_MAX - wy) / WORLD_RANGE) * drawH;
+    return { x: px, y: py };
+  }
+
+  function pixelToWorld(px, py) {
+    const { w, h } = getDrawSize();
+    const drawW = w - PADDING * 2;
+    const drawH = h - PADDING * 2;
+    const wx = WORLD_MIN + ((px - PADDING) / drawW) * WORLD_RANGE;
+    const wy = WORLD_MAX - ((py - PADDING) / drawH) * WORLD_RANGE;
+    return { x: wx, y: wy };
+  }
+
+  // --- State ---
+  let points = [];
+  let slope = 1.0;
+  let draggingPoint = null;
+  let hoverPoint = null;
+  let activation = 'linear';
+
+  // --- DOM refs ---
+  const slopeSlider = document.getElementById('slopeSlider');
+  const slopeValueLabel = document.getElementById('slopeValue');
+  const sseValueLabel = document.getElementById('sseValue');
+  const mseValueLabel = document.getElementById('mseValue');
+  const bestSlopeValueLabel = document.getElementById('bestSlopeValue');
+  const pointCountLabel = document.getElementById('pointCountValue');
+  const equationDisplay = document.getElementById('equationDisplay');
+  const showErrorLinesCheckbox = document.getElementById('showErrorLines');
+  const showBestLineCheckbox = document.getElementById('showBestLine');
+  const logScaleCheckbox = document.getElementById('logScale');
+  const sseBarFill = document.getElementById('sseBarFill');
+  const SSE_BAR_MAX = 10;
+
+  // --- Math ---
+  function activate(z) {
+    if (activation === 'tanh') return Math.tanh(z);
+    return z;
+  }
+
+  function predict(x, w) { return activate(w * x); }
+
+  function squaredError(point, w) {
+    const yPred = predict(point.x, w);
+    const err = point.y - yPred;
+    return err * err;
+  }
+
+  function totalSSE(w) {
+    return points.reduce((sum, p) => sum + squaredError(p, w), 0);
+  }
+
+  function bestSlope() {
+    if (activation === 'tanh') return bestSlopeNumerical();
+    let sumXY = 0, sumXX = 0;
+    for (const p of points) { sumXY += p.x * p.y; sumXX += p.x * p.x; }
+    if (sumXX === 0) return null;
+    return sumXY / sumXX;
+  }
+
+  function bestSlopeNumerical() {
+    if (points.length === 0) return null;
+    let w = 0.5;
+    const lr = 0.05;
+    for (let iter = 0; iter < 2000; iter++) {
+      let grad = 0;
+      for (const p of points) {
+        const z = w * p.x;
+        const yPred = Math.tanh(z);
+        const err = yPred - p.y;
+        grad += 2 * err * (1 - yPred * yPred) * p.x;
+      }
+      w -= lr * grad;
+    }
+    return w;
+  }
+
+  // --- Drawing ---
+  function draw() {
+    const { w, h } = getDrawSize();
+    ctx.clearRect(0, 0, w, h);
+    drawGrid(w, h);
+    drawAxes(w, h);
+    if (showBestLineCheckbox.checked) {
+      const bw = bestSlope();
+      if (bw !== null) drawLine(bw, '#2a9', true);
+    }
+    drawLine(slope, '#369', false);
+    if (showErrorLinesCheckbox.checked) drawErrors();
+    drawPoints();
+  }
+
+  function drawGrid(w, h) {
+    ctx.strokeStyle = '#f0f0f0';
+    ctx.lineWidth = 1;
+    ctx.font = '9px Courier New';
+    ctx.fillStyle = '#bbb';
+    for (let i = -10; i <= 10; i++) {
+      const val = i * 0.1;
+      if (val === 0) continue;
+      const px = worldToPixel(val, 0).x;
+      ctx.beginPath(); ctx.moveTo(px, PADDING); ctx.lineTo(px, h - PADDING); ctx.stroke();
+      if (i % 2 === 0) ctx.fillText(val.toFixed(1), px - 8, h - PADDING + 16);
+      const py = worldToPixel(0, val).y;
+      ctx.beginPath(); ctx.moveTo(PADDING, py); ctx.lineTo(w - PADDING, py); ctx.stroke();
+      if (i % 2 === 0) ctx.fillText(val.toFixed(1), PADDING - 24, py + 3);
+    }
+  }
+
+  function drawAxes(w, h) {
+    ctx.strokeStyle = '#ccc';
+    ctx.lineWidth = 1;
+    const y0 = worldToPixel(0, 0).y;
+    ctx.beginPath(); ctx.moveTo(PADDING, y0); ctx.lineTo(w - PADDING, y0); ctx.stroke();
+    const x0 = worldToPixel(0, 0).x;
+    ctx.beginPath(); ctx.moveTo(x0, PADDING); ctx.lineTo(x0, h - PADDING); ctx.stroke();
+    ctx.fillStyle = '#999';
+    ctx.font = '11px sans-serif';
+    ctx.fillText('x', w - PADDING + 8, y0 + 4);
+    ctx.fillText('y', x0 - 4, PADDING - 8);
+  }
+
+  function drawLine(w, color, dashed) {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = dashed ? 1.5 : 2;
+    if (dashed) ctx.setLineDash([6, 4]); else ctx.setLineDash([]);
+    if (activation === 'tanh') {
+      const steps = 200;
+      ctx.beginPath();
+      for (let i = 0; i <= steps; i++) {
+        const wx = WORLD_MIN + (i / steps) * WORLD_RANGE;
+        const wy = Math.tanh(w * wx);
+        const pp = worldToPixel(wx, wy);
+        if (i === 0) ctx.moveTo(pp.x, pp.y); else ctx.lineTo(pp.x, pp.y);
+      }
+      ctx.stroke();
+    } else {
+      const p1 = worldToPixel(WORLD_MIN, w * WORLD_MIN);
+      const p2 = worldToPixel(WORLD_MAX, w * WORLD_MAX);
+      ctx.beginPath(); ctx.moveTo(p1.x, p1.y); ctx.lineTo(p2.x, p2.y); ctx.stroke();
+    }
+    ctx.setLineDash([]);
+  }
+
+  function drawErrors() {
+    for (const p of points) {
+      const yPred = predict(p.x, slope);
+      const err = p.y - yPred;
+      const pPoint = worldToPixel(p.x, p.y);
+      const pLine = worldToPixel(p.x, yPred);
+      ctx.strokeStyle = err >= 0 ? '#d33' : '#e80';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.moveTo(pPoint.x, pPoint.y); ctx.lineTo(pLine.x, pLine.y); ctx.stroke();
+    }
+  }
+
+  function drawPoints() {
+    for (const p of points) {
+      const pp = worldToPixel(p.x, p.y);
+      const isHover = hoverPoint === p;
+      const isDrag = draggingPoint === p;
+      if (isHover || isDrag) {
+        ctx.fillStyle = '#36933';
+        ctx.beginPath(); ctx.arc(pp.x, pp.y, 10, 0, Math.PI * 2); ctx.fill();
+      }
+      ctx.fillStyle = isDrag ? '#369' : (isHover ? '#58a' : '#369');
+      ctx.strokeStyle = '#fff';
+      ctx.lineWidth = 1.5;
+      ctx.beginPath(); ctx.arc(pp.x, pp.y, 5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+      const se = squaredError(p, slope);
+      ctx.fillStyle = '#888';
+      ctx.font = '9px Courier New';
+      ctx.fillText(`(${p.x.toFixed(2)}, ${p.y.toFixed(2)}) err²=${se.toFixed(3)}`, pp.x + 8, pp.y - 7);
+      if (activation === 'tanh') drawActivationInset(p, pp);
+    }
+  }
+
+  function drawActivationInset(point, pp) {
+    const insetSize = 70;
+    const insetPad = 8;
+    let ix = pp.x + 14;
+    let iy = pp.y - insetSize - 14;
+    if (iy < PADDING) iy = pp.y + 14;
+    const { w: cw } = getDrawSize();
+    if (ix + insetSize > cw - PADDING) ix = pp.x - insetSize - 14;
+
+    const z = slope * point.x;
+    const a = Math.tanh(z);
+
+    ctx.fillStyle = '#ffffffdd';
+    ctx.strokeStyle = '#ddd';
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.roundRect(ix, iy, insetSize, insetSize, 4);
+    ctx.fill(); ctx.stroke();
+
+    const cx = ix + insetPad;
+    const cy = iy + insetPad;
+    const cw2 = insetSize - insetPad * 2;
+    const ch2 = insetSize - insetPad * 2;
+    const midX = cx + cw2 / 2;
+    const midY = cy + ch2 / 2;
+
+    ctx.strokeStyle = '#eee';
+    ctx.lineWidth = 0.5;
+    ctx.beginPath(); ctx.moveTo(cx, midY); ctx.lineTo(cx + cw2, midY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(midX, cy); ctx.lineTo(midX, cy + ch2); ctx.stroke();
+
+    const zAbsMax = Math.max(Math.abs(slope) * 1.2, 3);
+    const zMin = -zAbsMax, zMax = zAbsMax;
+
+    function zToInsetX(zv) { return cx + ((zv - zMin) / (zMax - zMin)) * cw2; }
+    function aToInsetY(av) { return midY - av * (ch2 / 2); }
+
+    ctx.strokeStyle = '#36988';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    const steps = 60;
+    for (let i = 0; i <= steps; i++) {
+      const zv = zMin + (i / steps) * (zMax - zMin);
+      const av = Math.tanh(slope * zv);
+      const px2 = zToInsetX(zv), py2 = aToInsetY(av);
+      if (i === 0) ctx.moveTo(px2, py2); else ctx.lineTo(px2, py2);
+    }
+    ctx.stroke();
+
+    const dotX = zToInsetX(z), dotY = aToInsetY(a);
+    ctx.strokeStyle = '#d3355';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([2, 2]);
+    ctx.beginPath(); ctx.moveTo(dotX, midY); ctx.lineTo(dotX, dotY); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(midX, dotY); ctx.lineTo(dotX, dotY); ctx.stroke();
+    ctx.setLineDash([]);
+
+    ctx.fillStyle = '#d33';
+    ctx.strokeStyle = '#fff';
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.arc(dotX, dotY, 3.5, 0, Math.PI * 2); ctx.fill(); ctx.stroke();
+
+    ctx.fillStyle = '#999';
+    ctx.font = '7px Courier New';
+    ctx.textAlign = 'center';
+    ctx.fillText('z', cx + cw2 - 2, midY + 8);
+    ctx.fillText('a', midX - 5, cy + 5);
+    ctx.fillStyle = '#d33';
+    ctx.fillText(`z=${z.toFixed(1)}`, midX, cy + ch2 + 6);
+    ctx.fillStyle = '#369';
+    ctx.textAlign = 'left';
+    ctx.fillText(`a=${a.toFixed(2)}`, cx + 2, cy + 8);
+    ctx.textAlign = 'left';
+  }
+
+  // --- Bar chart ---
+  // Fixed linear scale: 0 to BAR_CHART_MAX
+  const BAR_CHART_MAX = 4.0; // max squared error per point with data in [-1,1]
+
+  function drawBarChart() {
+    const rect = barCanvas.getBoundingClientRect();
+    const w = rect.width, h = rect.height;
+    const padTop = 30, padBottom = 30, padLeft = 10, padRight = 10;
+    const chartH = h - padTop - padBottom;
+    barCtx.clearRect(0, 0, w, h);
+
+    if (points.length === 0) {
+      barCtx.fillStyle = '#bbb';
+      barCtx.font = '11px Courier New';
+      barCtx.textAlign = 'center';
+      barCtx.fillText('No data points', w / 2, h / 2);
+      barCtx.textAlign = 'left';
+      return;
+    }
+
+    const errors = points.map(p => squaredError(p, slope));
+    const sse = errors.reduce((a, b) => a + b, 0);
+    const useLog = logScaleCheckbox.checked;
+
+    // Header
+    barCtx.fillStyle = '#d33';
+    barCtx.font = 'bold 12px Courier New';
+    barCtx.textAlign = 'center';
+    barCtx.fillText(`SSE = ${sse.toFixed(3)}`, w / 2, 16);
+    barCtx.textAlign = 'left';
+
+    // Scale label
+    barCtx.fillStyle = '#999';
+    barCtx.font = '9px Courier New';
+    barCtx.textAlign = 'right';
+    barCtx.fillText(useLog ? 'log scale' : `max ${BAR_CHART_MAX.toFixed(0)}`, w - padRight, 16);
+    barCtx.textAlign = 'left';
+
+    // Y-axis tick marks
+    drawBarChartAxis(w, h, padTop, padBottom, padLeft, padRight, useLog);
+
+    const n = points.length;
+    const totalBarSpace = w - padLeft - padRight;
+    const barWidth = Math.min(40, totalBarSpace / n - 6);
+    const slotWidth = totalBarSpace / n;
+
+    for (let i = 0; i < n; i++) {
+      const se = errors[i];
+      let barH;
+      if (useLog) {
+        // log scale: map [0.001, BAR_CHART_MAX] to [0, chartH]
+        // Use log10(1 + se/0.001) / log10(1 + BAR_CHART_MAX/0.001) for a smooth 0->max mapping
+        const minVal = 0.001;
+        if (se < minVal) {
+          barH = 0;
+        } else {
+          barH = (Math.log10(se / minVal) / Math.log10(BAR_CHART_MAX / minVal)) * chartH;
+        }
+      } else {
+        barH = Math.min(1, se / BAR_CHART_MAX) * chartH;
+      }
+      const barX = padLeft + i * slotWidth + (slotWidth - barWidth) / 2;
+      const barY = padTop + chartH - barH;
+      const isHover = hoverPoint === points[i] || draggingPoint === points[i];
+
+      // Bar
+      barCtx.fillStyle = se > 0 ? (isHover ? '#f55' : '#d33') : '#2a9';
+      barCtx.fillRect(barX, barY, barWidth, barH);
+      barCtx.strokeStyle = isHover ? '#333' : '#d3355';
+      barCtx.lineWidth = 1;
+      barCtx.strokeRect(barX, barY, barWidth, barH);
+
+      // Value label on top
+      barCtx.fillStyle = '#666';
+      barCtx.font = '9px Courier New';
+      barCtx.textAlign = 'center';
+      barCtx.fillText(se < 0.01 ? se.toExponential(1) : se.toFixed(3), barX + barWidth / 2, Math.max(barY - 4, padTop + 8));
+
+      // Point label below
+      barCtx.fillStyle = isHover ? '#369' : '#999';
+      barCtx.font = '10px Courier New';
+      barCtx.fillText(`P${i + 1}`, barX + barWidth / 2, h - padBottom + 16);
+      barCtx.textAlign = 'left';
+    }
+
+    // Baseline
+    barCtx.strokeStyle = '#ddd';
+    barCtx.lineWidth = 1;
+    barCtx.beginPath();
+    barCtx.moveTo(padLeft, padTop + chartH);
+    barCtx.lineTo(w - padRight, padTop + chartH);
+    barCtx.stroke();
+  }
+
+  function drawBarChartAxis(w, h, padTop, padBottom, padLeft, padRight, useLog) {
+    const chartH = h - padTop - padBottom;
+    const x = padLeft - 2;
+
+    if (useLog) {
+      // Log scale ticks: 0.001, 0.01, 0.1, 1
+      const ticks = [0.001, 0.01, 0.1, 1];
+      const minVal = 0.001;
+      barCtx.strokeStyle = '#eee';
+      barCtx.fillStyle = '#bbb';
+      barCtx.font = '7px Courier New';
+      barCtx.textAlign = 'right';
+      for (const t of ticks) {
+        const y = padTop + chartH - (Math.log10(t / minVal) / Math.log10(BAR_CHART_MAX / minVal)) * chartH;
+        barCtx.beginPath();
+        barCtx.moveTo(x, y);
+        barCtx.lineTo(w - padRight, y);
+        barCtx.stroke();
+        barCtx.fillText(t.toString(), x - 2, y + 2);
+      }
+      barCtx.textAlign = 'left';
+    } else {
+      // Linear ticks: 0, 1, 2, 3, 4
+      barCtx.strokeStyle = '#eee';
+      barCtx.fillStyle = '#bbb';
+      barCtx.font = '7px Courier New';
+      barCtx.textAlign = 'right';
+      for (let t = 0; t <= BAR_CHART_MAX; t++) {
+        const y = padTop + chartH - (t / BAR_CHART_MAX) * chartH;
+        barCtx.beginPath();
+        barCtx.moveTo(x, y);
+        barCtx.lineTo(w - padRight, y);
+        barCtx.stroke();
+        barCtx.fillText(t.toString(), x - 2, y + 2);
+      }
+      barCtx.textAlign = 'left';
+    }
+  }
+
+  // --- Interaction ---
+  function getMousePos(e) {
+    const rect = canvas.getBoundingClientRect();
+    return { x: e.clientX - rect.left, y: e.clientY - rect.top };
+  }
+
+  function findPointAt(px, py, threshold = 12) {
+    for (let i = points.length - 1; i >= 0; i--) {
+      const pp = worldToPixel(points[i].x, points[i].y);
+      const dx = px - pp.x, dy = py - pp.y;
+      if (dx * dx + dy * dy <= threshold * threshold) return points[i];
+    }
+    return null;
+  }
+
+  function clampWorld(v) {
+    return Math.max(WORLD_MIN + 0.01, Math.min(WORLD_MAX - 0.01, v));
+  }
+
+  canvas.addEventListener('mousedown', function(e) {
+    if (e.button === 2) return;
+    const mp = getMousePos(e);
+    const hit = findPointAt(mp.x, mp.y);
+    if (hit) {
+      draggingPoint = hit;
+      canvas.style.cursor = 'grabbing';
+    } else {
+      const wp = pixelToWorld(mp.x, mp.y);
+      wp.x = Math.round(wp.x * 100) / 100;
+      wp.y = Math.round(wp.y * 100) / 100;
+      if (wp.x > WORLD_MIN && wp.x < WORLD_MAX && wp.y > WORLD_MIN && wp.y < WORLD_MAX) {
+        points.push(wp);
+        updateAll();
+      }
+    }
+  });
+
+  canvas.addEventListener('mousemove', function(e) {
+    const mp = getMousePos(e);
+    if (draggingPoint) {
+      const wp = pixelToWorld(mp.x, mp.y);
+      draggingPoint.x = clampWorld(Math.round(wp.x * 100) / 100);
+      draggingPoint.y = clampWorld(Math.round(wp.y * 100) / 100);
+      updateAll();
+    } else {
+      const hit = findPointAt(mp.x, mp.y);
+      if (hit !== hoverPoint) {
+        hoverPoint = hit;
+        canvas.style.cursor = hit ? 'grab' : 'crosshair';
+        draw(); drawBarChart();
+      }
+    }
+  });
+
+  canvas.addEventListener('mouseup', function() {
+    draggingPoint = null;
+    canvas.style.cursor = hoverPoint ? 'grab' : 'crosshair';
+  });
+
+  canvas.addEventListener('mouseleave', function() {
+    draggingPoint = null;
+    hoverPoint = null;
+    canvas.style.cursor = 'crosshair';
+    draw(); drawBarChart();
+  });
+
+  canvas.addEventListener('contextmenu', function(e) {
+    e.preventDefault();
+    const mp = getMousePos(e);
+    const hit = findPointAt(mp.x, mp.y);
+    if (hit) { points = points.filter(p => p !== hit); updateAll(); }
+  });
+
+  // --- Listeners ---
+  slopeSlider.addEventListener('input', function() {
+    slope = parseFloat(slopeSlider.value);
+    updateAll();
+  });
+
+  // Mouse wheel adjusts slope when hovering over the slider or the chart
+  [slopeSlider, canvas].forEach(function(el) {
+    el.addEventListener('wheel', function(e) {
+      e.preventDefault();
+      const delta = e.deltaY < 0 ? 0.05 : -0.05;
+      slope = Math.max(parseFloat(slopeSlider.min), Math.min(parseFloat(slopeSlider.max), slope + delta));
+      slopeSlider.value = slope;
+      updateAll();
+    }, { passive: false });
+  });
+
+  document.getElementById('bestSlopeBtn').addEventListener('click', function() {
+    const bw = bestSlope();
+    if (bw !== null) { slope = bw; slopeSlider.value = slope; updateAll(); }
+  });
+
+  document.getElementById('resetSlopeBtn').addEventListener('click', function() {
+    slope = 1.0; slopeSlider.value = slope; updateAll();
+  });
+
+  document.getElementById('clearBtn').addEventListener('click', function() {
+    points = []; updateAll();
+  });
+
+  document.getElementById('seedBtn').addEventListener('click', function() {
+    points = [
+      { x: -0.8, y: -0.7 }, { x: -0.4, y: -0.3 },
+      { x: 0.1, y: 0.25 }, { x: 0.5, y: 0.6 }, { x: 0.9, y: 0.85 }
+    ];
+    updateAll();
+  });
+
+  [showErrorLinesCheckbox, showBestLineCheckbox, logScaleCheckbox].forEach(cb => {
+    cb.addEventListener('change', function() { draw(); drawBarChart(); });
+  });
+
+  document.querySelectorAll('input[name="activation"]').forEach(radio => {
+    radio.addEventListener('change', function() { activation = this.value; updateAll(); });
+  });
+
+  // --- Update ---
+  function updateAll() {
+    const sse = totalSSE(slope);
+    const n = points.length;
+    const mse = n > 0 ? sse / n : 0;
+    const bw = bestSlope();
+    slopeValueLabel.textContent = slope.toFixed(2);
+    sseValueLabel.textContent = sse.toFixed(3);
+    mseValueLabel.textContent = mse.toFixed(3);
+    pointCountLabel.textContent = n;
+    bestSlopeValueLabel.textContent = bw !== null ? bw.toFixed(4) : '—';
+    if (activation === 'tanh') {
+      equationDisplay.textContent = `y = tanh(${slope.toFixed(2)} · x)`;
+    } else {
+      equationDisplay.textContent = `y = ${slope.toFixed(2)} · x`;
+    }
+    const ssePct = Math.min(100, (sse / SSE_BAR_MAX) * 100);
+    sseBarFill.style.width = ssePct + '%';
+    draw(); drawBarChart();
+  }
+
+  // --- Init ---
+  function init() {
+    setupCanvas();
+    points = [
+      { x: -0.8, y: -0.7 }, { x: -0.4, y: -0.3 },
+      { x: 0.1, y: 0.25 }, { x: 0.5, y: 0.6 }, { x: 0.9, y: 0.85 }
+    ];
+    updateAll();
+  }
+
+  window.addEventListener('resize', function() { setupCanvas(); draw(); drawBarChart(); });
+  init();
+})();
+</script>
+</body>
+</html>
