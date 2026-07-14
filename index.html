@@ -27,7 +27,41 @@
   .subtitle {
     font-size: 0.8rem;
     color: #888;
+    margin-bottom: 12px;
+  }
+
+  .scratchpad {
+    width: 100%;
+    max-width: 1360px;
     margin-bottom: 16px;
+  }
+
+  .scratchpad label {
+    display: block;
+    font-size: 0.7rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    color: #999;
+    margin-bottom: 5px;
+  }
+
+  .scratchpad textarea {
+    width: 100%;
+    min-height: 72px;
+    resize: vertical;
+    display: block;
+    padding: 9px;
+    font: 0.85rem/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    color: #222;
+    background: #fff;
+    border: 1px solid #e0e0e0;
+    border-radius: 6px;
+  }
+
+  .scratchpad textarea:focus {
+    outline: 2px solid #b9d2e8;
+    outline-offset: 1px;
+    border-color: #9cbddd;
   }
 
   .main-container {
@@ -149,6 +183,11 @@
 
 <h1>Gradient Descent Playground</h1>
 <p class="subtitle">y = f(w·x), bias = 0 — minimize the sum of squared errors by adjusting w</p>
+
+<div class="scratchpad">
+  <label for="scratchpad">Scratch pad</label>
+  <textarea id="scratchpad" placeholder="Keep notes, observations, or questions here…" aria-label="Scratch pad"></textarea>
+</div>
 
 <div class="main-container">
 
@@ -303,6 +342,8 @@
   const showBestLineCheckbox = document.getElementById('showBestLine');
   const logScaleCheckbox = document.getElementById('logScale');
   const sseBarFill = document.getElementById('sseBarFill');
+  const scratchpad = document.getElementById('scratchpad');
+  const SCRATCHPAD_STORAGE_KEY = 'gradient-descent-scratchpad';
   const SSE_BAR_MAX = 10;
 
   // --- Math ---
@@ -730,6 +771,11 @@
   });
 
   // --- Listeners ---
+  // Notes are local to this browser/device and restore automatically.
+  scratchpad.value = localStorage.getItem(SCRATCHPAD_STORAGE_KEY) || '';
+  scratchpad.addEventListener('input', function() {
+    localStorage.setItem(SCRATCHPAD_STORAGE_KEY, scratchpad.value);
+  });
   slopeSlider.addEventListener('input', function() {
     slope = parseFloat(slopeSlider.value);
     updateAll();
