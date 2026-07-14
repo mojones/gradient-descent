@@ -344,7 +344,39 @@
   const sseBarFill = document.getElementById('sseBarFill');
   const scratchpad = document.getElementById('scratchpad');
   const SCRATCHPAD_STORAGE_KEY = 'gradient-descent-scratchpad';
+  const POINTS_URL_PARAM = 'points';
   const SSE_BAR_MAX = 10;
+
+  // --- Shareable data points ---
+  // Points are encoded as: ?points=x1,y1;x2,y2;...
+  function pointsFromUrl() {
+    const params = new URLSearchParams(window.location.search);
+    if (!params.has(POINTS_URL_PARAM)) return null;
+
+    const value = params.get(POINTS_URL_PARAM);
+    if (!value) return [];
+
+    return value.split(';').slice(0, 50).flatMap(function(pair) {
+      const values = pair.split(',');
+      if (values.length !== 2) return [];
+      const x = Number(values[0]);
+      const y = Number(values[1]);
+      if (!Number.isFinite(x) || !Number.isFinite(y) ||
+          x <= WORLD_MIN || x >= WORLD_MAX || y <= WORLD_MIN || y >= WORLD_MAX) {
+        return [];
+      }
+      return [{ x: Math.round(x * 100) / 100, y: Math.round(y * 100) / 100 }];
+    });
+  }
+
+  function syncPointsToUrl() {
+    const url = new URL(window.location.href);
+    const encodedPoints = points.map(function(point) {
+      return `${point.x.toFixed(2)},${point.y.toFixed(2)}`;
+    }).join(';');
+    url.searchParams.set(POINTS_URL_PARAM, encodedPoints);
+    window.history.replaceState(null, '', url);
+  }
 
   // --- Math ---
   function activate(z) {
@@ -839,16 +871,18 @@
     }
     const ssePct = Math.min(100, (sse / SSE_BAR_MAX) * 100);
     sseBarFill.style.width = ssePct + '%';
+    syncPointsToUrl();
     draw(); drawBarChart();
   }
 
   // --- Init ---
   function init() {
     setupCanvas();
-    points = [
+    const urlPoints = pointsFromUrl();
+    points = urlPoints === null ? [
       { x: -0.8, y: -0.7 }, { x: -0.4, y: -0.3 },
       { x: 0.1, y: 0.25 }, { x: 0.5, y: 0.6 }, { x: 0.9, y: 0.85 }
-    ];
+    ] : urlPoints;
     updateAll();
   }
 
